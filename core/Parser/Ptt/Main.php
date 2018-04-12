@@ -7,8 +7,8 @@ class Main
 {
     public function __construct(){
         $this->conf = [
-            "page_count" => 10,
-            "nrec"       => 10
+            "page_count" => 15,
+            "nrec"       => 30
         ];
         $this->PTT_url    = "https://www.ptt.cc";
         $this->Beauty_url = "/bbs/Beauty/index.html";
@@ -19,9 +19,10 @@ class Main
         $total_image_url = [];
         //******Start Parser******
         $page_count = 0;
-        while ($page_count < 10) {
+        $Beauty_url = $this->Beauty_url;
+        while ($page_count < $this->conf["page_count"]) {
             //Get html content
-            $content = $this->_GetContent($this->PTT_url . $this->Beauty_url);
+            $content = $this->_GetContent($this->PTT_url . $Beauty_url);
             //Parser list
             $parser_list_result = $this->_ParserList($content, $page_count);
             foreach ($parser_list_result["lists_href"] as $value) {
@@ -29,6 +30,7 @@ class Main
             }
             $page_count = $parser_list_result["page_count"];
             $Beauty_url = $parser_list_result["last_href"];
+            echo $page_count."\n";
         }
         foreach ($total_pages_url as $page_url) {
             //Get html content
@@ -37,6 +39,7 @@ class Main
             foreach ($parser_page_result as $value) {
                 array_push($total_image_url, $value);
             }
+            echo count($total_image_url)."\n";
         }
         return $total_image_url;
     }
@@ -44,6 +47,7 @@ class Main
         $ch = curl_init();
         curl_setopt($ch , CURLOPT_URL , $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, TRUE);
+        curl_setopt($ch, CURLOPT_FRESH_CONNECT, 1);
         curl_setopt($ch, CURLOPT_USERAGENT, "Mozilla/5.0 (Windows NT 6.1; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/65.0.3325.181 Safari/537.36");
         $html_content = curl_exec($ch);
         curl_close($ch);
@@ -110,9 +114,21 @@ class Main
     {
         $pq_obj     = phpQuery::newDocument($content);
         $images_url = [];
+        $id_list    = [];
         foreach ($pq_obj["#main-content div.richcontent"] as $image_href) {
-            $url = trim(pq($image_href)->find("a")->attr("href"));
-            array_push($images_url, "https:" . $url . ".png");
+            $id = trim(pq($image_href)->find("blockquote")->attr("data-id"));
+            array_push($id_list, $id);
+        }
+        foreach ($pq_obj["#main-content a"] as $value) {
+            $href = pq($value)->attr("href");
+            if (false !== strpos($href, "https://i.imgur.com")) {
+                foreach ($id_list as $id) {
+                    if (false !== strpos($href, $id.".")) {
+                        array_push($images_url, $href);
+                        break;
+                    }
+                }
+            }
         }
         return $images_url;
     }
